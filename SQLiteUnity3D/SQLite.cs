@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using Mono.Data.Sqlite;
 using UnityEngine;
 
@@ -13,8 +14,19 @@ namespace SQLiteUnity3D
 
 		public static void SetPath(string path)
 		{
-			dbPath = "URI=file:" + Application.persistentDataPath + "/" + path;
+			dbPath = "URI=file:" + Application.persistentDataPath + "/" + path + ".db";
+			CreateDatabase(path);
 			Debug.Log(dbPath);
+		}
+
+		private static void CreateDatabase(string dbName = "database")
+		{
+			string pathString = Application.persistentDataPath + "/" + dbName + ".db";
+
+			if(!System.IO.File.Exists(pathString))
+			{
+				System.IO.FileStream fs = System.IO.File.Create(pathString);			
+			}
 		}
 
 		/// <summary>
@@ -44,7 +56,15 @@ namespace SQLiteUnity3D
 					throw new ArgumentException("dataType cannot be null, dataType can only be of Type int, string, char, float or double");
 				}
 
-				sqlInput += ", '" + pair.Key + "' " + dataType;
+				Regex r = new Regex("^[a-zA-Z0-9]*$");
+				if (r.IsMatch(pair.Key))
+				{
+					sqlInput += ", '" + pair.Key + "' " + dataType;
+				}
+				else
+				{
+					throw new ArgumentException("data must contain only alphanumeric characters");
+				}
 			}
 			sqlInput += ");";
 
@@ -62,16 +82,26 @@ namespace SQLiteUnity3D
 			}
 		}
 
-		public static void AddToTable(string tableName, object insertedValues)
+		public static void AddRow(string tableName, object insertedValues)
 		{
+			
 			Type type = insertedValues.GetType();
 			PropertyInfo[] properties = type.GetProperties();
 			List<string> columnNames = GetColumnNames(tableName);
-			string sqlInput = null; 
+			string valTableName = CheckString(tableName);
+			string sqlInput = "INSERT INTO '" + valTableName + "VALUES ( " ; 
 
 			foreach (PropertyInfo property in properties)
 			{
 				var value = property.GetValue(property);
+
+				if (value is string)
+				{
+					value = CheckString(Convert.ToString(value));
+				}
+
+				sqlInput += value + ", ";
+				
 			}
 
 			using (var conn = new SqliteConnection(dbPath))
@@ -111,5 +141,20 @@ namespace SQLiteUnity3D
 			}
 			return new List<string>();
 		}
+
+		private static string CheckString(string s)
+		{
+			Regex r = new Regex("^[a-zA-Z0-9]*$");
+			if (!r.IsMatch(s))
+			{
+				throw new ArgumentException("data must contain only alphanumeric characters");	
+			}
+			else
+			{
+				return s;
+			}
+		}
+
+
 	}
 }
